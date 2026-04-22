@@ -13,28 +13,27 @@ app.use(express.json());
 app.use(morgan("dev"));
 app.use(apiLimiter);
 
-// Base routes
+// base route
 app.get('/', (req, res) => {
-  res.send("API running");
+    res.send("API running");
 });
 
+// add THIS (missing piece)
 app.get('/api/v1', (req, res) => {
-  res.json({
-    message: "MindMate API v1 is running"
-  });
+    res.json({
+        message: "MindMate API v1 is running"
+    });
 });
 
-// Main routes
+// main routes
 app.use('/api/v1', userRoutes);
 
-// Handle unknown routes
+// 404 handler (recommended)
 app.use((req, res) => {
-  res.status(404).json({
-    error: "Route not found"
-  });
+    res.status(404).json({ error: "Route not found" });
 });
 
-// Error handler
+// error handler
 app.use(errorHandler);
 
 export default app;
