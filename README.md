@@ -1,4 +1,4 @@
-# MindMate Backend
+# You_Matter Backend
 
 A backend service for an AI-powered mental health companion application built with Node.js, Express, and Supabase. The system supports user profiles, chat history, mood tracking, journaling, and crisis alerts with secure access control using JWT authentication and Row Level Security (RLS).
 
