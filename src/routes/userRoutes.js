@@ -17,7 +17,7 @@ const router = express.Router();
 
 // public
 router.post('/users', verifyUser, createUser);
-router.get('/users', getUsers);
+router.get('/users',verifyUser, getUsers);
 
 // protected
 router.post('/message', verifyUser, saveMessage);
