@@ -16,7 +16,7 @@ export const verifyUser = async (req, res, next) => {
       return res.status(401).json({ error: error.message });
     }
 
-    req.user = data.user; // 🔥 THIS IS CRITICAL
+    req.user = data.user; //  THIS IS CRITICAL
 
     next();
   } catch (err) {

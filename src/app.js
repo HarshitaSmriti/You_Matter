@@ -10,18 +10,31 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use(morgan("dev"));        // logging
-app.use(apiLimiter);           // rate limit
+app.use(morgan("dev"));
+app.use(apiLimiter);
 
-// ✅ ONLY ONE ROUTE PREFIX
-app.use('/api/v1', userRoutes);
-
-// optional test route
+// Base routes
 app.get('/', (req, res) => {
-    res.send("API running");
+  res.send("API running");
 });
 
-// ✅ ERROR HANDLER MUST BE LAST
+app.get('/api/v1', (req, res) => {
+  res.json({
+    message: "MindMate API v1 is running"
+  });
+});
+
+// Main routes
+app.use('/api/v1', userRoutes);
+
+// Handle unknown routes
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Route not found"
+  });
+});
+
+// Error handler
 app.use(errorHandler);
 
 export default app;
