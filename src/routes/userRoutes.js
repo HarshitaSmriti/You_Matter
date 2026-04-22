@@ -16,7 +16,7 @@ import { strictLimiter } from "../middleware/rateLimiter.js";
 const router = express.Router();
 
 // public
-router.post('/users', createUser);
+router.post('/users', verifyUser, createUser);
 router.get('/users', getUsers);
 
 // protected
