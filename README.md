@@ -125,17 +125,39 @@ src/
 * All database operations are protected by RLS policies
 
 ---
+## System Flow
 
+1. User authenticates using Supabase (JWT-based authentication)
+2. Frontend sends requests with Bearer token
+3. Express middleware verifies token and user identity
+4. Requests are routed to appropriate controllers
+5. Data is validated using Zod schemas
+6. Database operations are performed via Supabase (PostgreSQL with RLS)
+7. RLS ensures users can only access their own data
+8. Response is sent back to frontend securely
+
+## AI Integration (In Progress)
+
+- Emotion detection from user messages
+- Context-aware responses using memory
+- Crisis keyword detection and alert triggering
+- Personalized conversation based on user mood patterns
+
+## Deployment Architecture
+
+- Backend deployed on Render
+- Supabase handles database + authentication
+- Frontend (AWS hosted) communicates via REST APIs
+
+----
 ## Author
 
 Harshita Smriti
 
 ---
-
-## Future Improvements
-
-* AI chat integration
-* Therapist dashboard
+## Contributors
+- Harshita Smriti
+- Aishwarya Shree
 * Frontend integration
 * Advanced mood analytics
 * Real-time features
