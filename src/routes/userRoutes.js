@@ -8,7 +8,9 @@ import {
   getMood,
   addDiary,
   getDiary,
-  createCrisis
+  createCrisis,
+  deleteDiary,
+  updateDiary
 } from '../controllers/userController.js';
 
 import { verifyUser } from '../middleware/authMiddleware.js';
@@ -30,5 +32,9 @@ router.post('/diary', verifyUser, addDiary);
 router.get('/diary', verifyUser, getDiary);
 
 router.post('/crisis', verifyUser, strictLimiter, createCrisis);
+
+router.delete('/diary/:id', verifyUser, deleteDiary);
+
+router.patch('/diary/:id', verifyUser, updateDiary);
 
 export default router;

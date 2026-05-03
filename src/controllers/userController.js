@@ -159,17 +159,22 @@ export const getMood = async (req, res, next) => {
 };
 
 
-// ADD DIARY
+// ADD DIARY ✅ UPDATED
 export const addDiary = async (req, res, next) => {
     try {
-        const { content } = diarySchema.parse(req.body);
+        const { title, content, mood } = diarySchema.parse(req.body);
         const user_id = req.user.id;
 
         const supabaseUser = getUserClient(req);
 
         const { data, error } = await supabaseUser
             .from('diary_entries')
-            .insert([{ user_id, content }])
+            .insert([{
+                user_id,
+                title,
+                content,
+                mood
+            }])
             .select();
 
         if (error) throw error;
@@ -202,7 +207,52 @@ export const getDiary = async (req, res, next) => {
         next(err);
     }
 };
+//DELETE DIARY
+export const deleteDiary = async (req, res, next) => {
+  try {
+    const user_id = req.user.id;
+    const { id } = req.params;
 
+    const supabaseUser = getUserClient(req);
+
+    const { error } = await supabaseUser
+      .from('diary_entries')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user_id);
+
+    if (error) throw error;
+
+    res.json({ message: "Diary deleted" });
+
+  } catch (err) {
+    next(err);
+  }
+};
+//EDIT DIARY
+export const updateDiary = async (req, res, next) => {
+  try {
+    const user_id = req.user.id;
+    const { id } = req.params;
+    const { title, content, mood } = req.body;
+
+    const supabaseUser = getUserClient(req);
+
+    const { data, error } = await supabaseUser
+      .from('diary_entries')
+      .update({ title, content, mood })
+      .eq('id', id)
+      .eq('user_id', user_id)
+      .select();
+
+    if (error) throw error;
+
+    res.json({ message: "Diary updated", data });
+
+  } catch (err) {
+    next(err);
+  }
+};
 
 // CRISIS ALERT
 export const createCrisis = async (req, res, next) => {
