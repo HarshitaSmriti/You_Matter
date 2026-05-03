@@ -159,7 +159,7 @@ export const getMood = async (req, res, next) => {
 };
 
 
-// ADD DIARY ✅ UPDATED
+// ADD DIARY UPDATED
 export const addDiary = async (req, res, next) => {
     try {
         const { title, content, mood } = diarySchema.parse(req.body);
