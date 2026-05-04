@@ -81,48 +81,28 @@ export const saveMessage = async (req, res, next) => {
 
     const supabaseUser = getUserClient(req);
 
-    // 1. Get user consent
-    const { data: userProfile, error: userError } = await supabaseUser
-      .from("users")
-      .select(
-        "guardian_alert, helpline_alert, alerts_paused, guardian_email, guardian_name"
-      )
-      .eq("user_id", user_id)
-      .single();
+    // ❌ REMOVED DB consent query (columns don't exist)
 
-    if (userError) throw userError;
-
-    if (!userProfile) {
-      return res.status(404).json({ error: "User profile not found" });
-    }
-
-    // 2. Call AI (EC2)
+    // ✅ Call AI directly
     const aiResponse = await axios.post(
       "http://107.21.23.105:8000/chat",
       {
         user_id,
         message,
-        consent: {
-          guardian_alert: userProfile.guardian_alert || false,
-          helpline_alert: userProfile.helpline_alert || false,
-          alerts_paused: userProfile.alerts_paused || false,
-          guardian_email: userProfile.guardian_email || null,
-          guardian_name: userProfile.guardian_name || null,
-        },
       },
       { timeout: 10000 }
     );
 
-    console.log("AI RAW RESPONSE:", aiResponse.data); //  debug
+    console.log("AI RAW RESPONSE:", aiResponse.data);
 
     const reply =
-    aiResponse.data?.reply ||
-    aiResponse.data?.response ||
-    aiResponse.data?.output ||
-    aiResponse.data?.text ||
-    "No AI response";
+      aiResponse.data?.reply ||
+      aiResponse.data?.response ||
+      aiResponse.data?.output ||
+      aiResponse.data?.text ||
+      "I'm here with you 💜";
 
-    // 3. Save both messages
+    // ✅ Save both messages
     const { error: insertError } = await supabaseUser
       .from("conversations")
       .insert([
@@ -132,7 +112,7 @@ export const saveMessage = async (req, res, next) => {
 
     if (insertError) throw insertError;
 
-    // 4. Return reply
+    // ✅ Return reply
     res.json({ reply });
 
   } catch (err) {
