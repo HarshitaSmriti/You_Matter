@@ -1,6 +1,7 @@
 import supabase from '../config/supabaseClient.js';
 import { sendCrisisEmail } from '../utils/emailService.js';
 import { createClient } from "@supabase/supabase-js";
+import axios from "axios";
 
 import { moodSchema } from "../validators/moodValidator.js";
 import { diarySchema } from "../validators/diaryValidator.js";
@@ -9,205 +10,250 @@ import { crisisSchema } from "../validators/crisisValidator.js";
 
 // helper → create per-request supabase client with user token
 const getUserClient = (req) => {
-    const token = req.headers.authorization?.split(" ")[1];
+  const token = req.headers.authorization?.split(" ")[1];
 
-    return createClient(
-        process.env.SUPABASE_URL,
-        process.env.SUPABASE_ANON_KEY,
-        {
-            global: {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            },
-        }
-    );
+  return createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY,
+    {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    }
+  );
 };
 
 
-// CREATE USER
+
+// ================= CREATE USER =================
 export const createUser = async (req, res, next) => {
-    try {
-        const user_id = req.user.id;
-        const { name } = req.body;
+  try {
+    const user_id = req.user.id;
+    const { name } = req.body;
 
-        const supabaseUser = getUserClient(req);
+    const supabaseUser = getUserClient(req);
 
-        const { data, error } = await supabaseUser
-            .from('users')
-            .insert([{ user_id, name }])
-            .select();
+    const { data, error } = await supabaseUser
+      .from('users')
+      .insert([{ user_id, name }])
+      .select();
 
-        if (error) throw error;
+    if (error) throw error;
 
-        res.json({ message: "Profile created", data });
+    res.json({ message: "Profile created", data });
 
-    } catch (err) {
-        next(err);
-    }
+  } catch (err) {
+    next(err);
+  }
 };
 
 
-// GET USERS
+
+// ================= GET USERS =================
 export const getUsers = async (req, res, next) => {
-    try {
-        const user_id = req.user.id;
-        const supabaseUser = getUserClient(req);
+  try {
+    const user_id = req.user.id;
+    const supabaseUser = getUserClient(req);
 
-        const { data, error } = await supabaseUser
-            .from('users')
-            .select('*')
-            .eq('user_id', user_id);
+    const { data, error } = await supabaseUser
+      .from('users')
+      .select('*')
+      .eq('user_id', user_id);
 
-        if (error) throw error;
+    if (error) throw error;
 
-        res.json({ message: "Users fetched", data });
+    res.json({ message: "Users fetched", data });
 
-    } catch (err) {
-        next(err);
-    }
+  } catch (err) {
+    next(err);
+  }
 };
 
 
-// SAVE MESSAGE
+
+// ================= SAVE MESSAGE (AI INTEGRATED) =================
 export const saveMessage = async (req, res, next) => {
-    try {
-        const { message, sender } = messageSchema.parse(req.body);
-        const user_id = req.user.id;
+  try {
+    const { message } = messageSchema.parse(req.body);
+    const user_id = req.user.id;
 
-        const supabaseUser = getUserClient(req);
+    const supabaseUser = getUserClient(req);
 
-        const { data, error } = await supabaseUser
-            .from('conversations')
-            .insert([{ user_id, message, sender }])
-            .select();
+    // 1. Get user consent
+    const { data: userProfile, error: userError } = await supabaseUser
+      .from("users")
+      .select(
+        "guardian_alert, helpline_alert, alerts_paused, guardian_email, guardian_name"
+      )
+      .eq("user_id", user_id)
+      .single();
 
-        if (error) throw error;
+    if (userError) throw userError;
 
-        res.json({ message: "Message saved", data });
-
-    } catch (err) {
-        next(err);
+    if (!userProfile) {
+      return res.status(404).json({ error: "User profile not found" });
     }
+
+    // 2. Call AI (EC2)
+    const aiResponse = await axios.post(
+      "http://107.21.23.105:8000/chat",
+      {
+        user_id,
+        message,
+        consent: {
+          guardian_alert: userProfile.guardian_alert || false,
+          helpline_alert: userProfile.helpline_alert || false,
+          alerts_paused: userProfile.alerts_paused || false,
+          guardian_email: userProfile.guardian_email || null,
+          guardian_name: userProfile.guardian_name || null,
+        },
+      },
+      { timeout: 10000 }
+    );
+
+    const reply = aiResponse.data.reply;
+
+    // 3. Save both messages
+    const { error: insertError } = await supabaseUser
+      .from("conversations")
+      .insert([
+        { user_id, message, sender: "user" },
+        { user_id, message: reply, sender: "ai" },
+      ]);
+
+    if (insertError) throw insertError;
+
+    // 4. Return reply
+    res.json({ reply });
+
+  } catch (err) {
+    console.error("SAVE MESSAGE ERROR:", err.message);
+    next(err);
+  }
 };
 
 
-// GET CONVERSATION
+
+// ================= GET CONVERSATION =================
 export const getConversation = async (req, res, next) => {
-    try {
-        const user_id = req.user.id;
-        const supabaseUser = getUserClient(req);
+  try {
+    const user_id = req.user.id;
+    const supabaseUser = getUserClient(req);
 
-        const { data, error } = await supabaseUser
-            .from('conversations')
-            .select('*')
-            .eq('user_id', user_id)
-            .order('created_at', { ascending: true });
+    const { data, error } = await supabaseUser
+      .from('conversations')
+      .select('*')
+      .eq('user_id', user_id)
+      .order('created_at', { ascending: true });
 
-        if (error) throw error;
+    if (error) throw error;
 
-        res.json({ message: "Conversation fetched", data });
+    res.json({ message: "Conversation fetched", data });
 
-    } catch (err) {
-        next(err);
-    }
+  } catch (err) {
+    next(err);
+  }
 };
 
 
-// ADD MOOD
+
+// ================= ADD MOOD =================
 export const addMood = async (req, res, next) => {
-    try {
-        const { mood_score, mood_label, note } = moodSchema.parse(req.body);
-        const user_id = req.user.id;
+  try {
+    const { mood_score, mood_label, note } = moodSchema.parse(req.body);
+    const user_id = req.user.id;
 
-        const supabaseUser = getUserClient(req);
+    const supabaseUser = getUserClient(req);
 
-        const { data, error } = await supabaseUser
-            .from('mood_logs')
-            .insert([{ user_id, mood_score, mood_label, note }])
-            .select();
+    const { data, error } = await supabaseUser
+      .from('mood_logs')
+      .insert([{ user_id, mood_score, mood_label, note }])
+      .select();
 
-        if (error) throw error;
+    if (error) throw error;
 
-        res.json({ message: "Mood logged", data });
+    res.json({ message: "Mood logged", data });
 
-    } catch (err) {
-        next(err);
-    }
+  } catch (err) {
+    next(err);
+  }
 };
 
 
-// GET MOOD
+
+// ================= GET MOOD =================
 export const getMood = async (req, res, next) => {
-    try {
-        const user_id = req.user.id;
-        const supabaseUser = getUserClient(req);
+  try {
+    const user_id = req.user.id;
+    const supabaseUser = getUserClient(req);
 
-        const { data, error } = await supabaseUser
-            .from('mood_logs')
-            .select('*')
-            .eq('user_id', user_id)
-            .order('created_at', { ascending: false });
+    const { data, error } = await supabaseUser
+      .from('mood_logs')
+      .select('*')
+      .eq('user_id', user_id)
+      .order('created_at', { ascending: false });
 
-        if (error) throw error;
+    if (error) throw error;
 
-        res.json({ message: "Mood history", data });
+    res.json({ message: "Mood history", data });
 
-    } catch (err) {
-        next(err);
-    }
+  } catch (err) {
+    next(err);
+  }
 };
 
 
-// ADD DIARY UPDATED
+
+// ================= ADD DIARY =================
 export const addDiary = async (req, res, next) => {
-    try {
-        const { title, content, mood } = diarySchema.parse(req.body);
-        const user_id = req.user.id;
+  try {
+    const { title, content, mood } = diarySchema.parse(req.body);
+    const user_id = req.user.id;
 
-        const supabaseUser = getUserClient(req);
+    const supabaseUser = getUserClient(req);
 
-        const { data, error } = await supabaseUser
-            .from('diary_entries')
-            .insert([{
-                user_id,
-                title,
-                content,
-                mood
-            }])
-            .select();
+    const { data, error } = await supabaseUser
+      .from('diary_entries')
+      .insert([{ user_id, title, content, mood }])
+      .select();
 
-        if (error) throw error;
+    if (error) throw error;
 
-        res.json({ message: "Diary saved", data });
+    res.json({ message: "Diary saved", data });
 
-    } catch (err) {
-        next(err);
-    }
+  } catch (err) {
+    next(err);
+  }
 };
 
 
-// GET DIARY
+
+// ================= GET DIARY =================
 export const getDiary = async (req, res, next) => {
-    try {
-        const user_id = req.user.id;
-        const supabaseUser = getUserClient(req);
+  try {
+    const user_id = req.user.id;
+    const supabaseUser = getUserClient(req);
 
-        const { data, error } = await supabaseUser
-            .from('diary_entries')
-            .select('*')
-            .eq('user_id', user_id)
-            .order('created_at', { ascending: false });
+    const { data, error } = await supabaseUser
+      .from('diary_entries')
+      .select('*')
+      .eq('user_id', user_id)
+      .order('created_at', { ascending: false });
 
-        if (error) throw error;
+    if (error) throw error;
 
-        res.json({ message: "Diary entries", data });
+    res.json({ message: "Diary entries", data });
 
-    } catch (err) {
-        next(err);
-    }
+  } catch (err) {
+    next(err);
+  }
 };
-//DELETE DIARY
+
+
+
+// ================= DELETE DIARY =================
 export const deleteDiary = async (req, res, next) => {
   try {
     const user_id = req.user.id;
@@ -229,7 +275,10 @@ export const deleteDiary = async (req, res, next) => {
     next(err);
   }
 };
-//EDIT DIARY
+
+
+
+// ================= UPDATE DIARY =================
 export const updateDiary = async (req, res, next) => {
   try {
     const user_id = req.user.id;
@@ -254,37 +303,35 @@ export const updateDiary = async (req, res, next) => {
   }
 };
 
-// CRISIS ALERT
+
+
+// ================= CRISIS ALERT =================
 export const createCrisis = async (req, res, next) => {
+  try {
+    const { message_that_triggered, alert_sent_to } = crisisSchema.parse(req.body);
+    const user_id = req.user.id;
+
+    const supabaseUser = getUserClient(req);
+
+    const { data, error } = await supabaseUser
+      .from('crisis_alerts')
+      .insert([{ user_id, message_that_triggered, alert_sent_to }])
+      .select();
+
+    if (error) throw error;
+
     try {
-        const { message_that_triggered, alert_sent_to } = crisisSchema.parse(req.body);
-        const user_id = req.user.id;
-
-        const supabaseUser = getUserClient(req);
-
-        const { data, error } = await supabaseUser
-            .from('crisis_alerts')
-            .insert([{
-                user_id,
-                message_that_triggered,
-                alert_sent_to
-            }])
-            .select();
-
-        if (error) throw error;
-
-        try {
-            await sendCrisisEmail(alert_sent_to, message_that_triggered);
-        } catch (emailErr) {
-            console.log("Email failed:", emailErr.message);
-        }
-
-        res.json({
-            message: "Crisis alert saved + email attempted",
-            data
-        });
-
-    } catch (err) {
-        next(err);
+      await sendCrisisEmail(alert_sent_to, message_that_triggered);
+    } catch (emailErr) {
+      console.log("Email failed:", emailErr.message);
     }
+
+    res.json({
+      message: "Crisis alert saved + email attempted",
+      data
+    });
+
+  } catch (err) {
+    next(err);
+  }
 };
