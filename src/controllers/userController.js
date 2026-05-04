@@ -113,7 +113,14 @@ export const saveMessage = async (req, res, next) => {
       { timeout: 10000 }
     );
 
-    const reply = aiResponse.data.reply;
+    console.log("AI RAW RESPONSE:", aiResponse.data); //  debug
+
+    const reply =
+    aiResponse.data?.reply ||
+    aiResponse.data?.response ||
+    aiResponse.data?.output ||
+    aiResponse.data?.text ||
+    "No AI response";
 
     // 3. Save both messages
     const { error: insertError } = await supabaseUser
