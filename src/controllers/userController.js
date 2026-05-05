@@ -197,20 +197,46 @@ export const getMood = async (req, res, next) => {
 export const addDiary = async (req, res, next) => {
   try {
     const { title, content, mood } = diarySchema.parse(req.body);
+
+    // 🔴 ensure user exists
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     const user_id = req.user.id;
 
     const supabaseUser = getUserClient(req);
 
     const { data, error } = await supabaseUser
-      .from('diary_entries')
-      .insert([{ user_id, title, content, mood }])
+      .from("diary_entries")
+      .insert([
+        {
+          user_id,
+          title,     // ⚠️ remove this line if column doesn't exist
+          content,
+          mood,
+        },
+      ])
       .select();
 
-    if (error) throw error;
+    // 🔥 LOGS (VERY IMPORTANT)
+    console.log("INSERT DATA:", data);
+    console.log("INSERT ERROR:", error);
 
-    res.json({ message: "Diary saved", data });
+    if (error) {
+      return res.status(500).json({
+        message: "Supabase insert failed",
+        error: error.message,
+      });
+    }
+
+    res.status(200).json({
+      message: "Diary saved",
+      data,
+    });
 
   } catch (err) {
+    console.error("ADD DIARY ERROR:", err.message);
     next(err);
   }
 };
