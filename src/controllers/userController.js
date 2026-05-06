@@ -339,13 +339,13 @@ export const createCrisis = async (req, res, next) => {
 
     const { data: userData } = await supabaseUser
       .from("users")
-      .select("name")
+      .select("name, guardian_email")
       .eq("user_id", user_id)
       .single();
 
     try {
       await sendCrisisEmail(
-        "yoursecondemail@gmail.com",
+        userData?.guardian_email,
         userData?.name || "A user",
         message_that_triggered
       );
