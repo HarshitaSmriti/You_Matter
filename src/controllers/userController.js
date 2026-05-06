@@ -365,3 +365,40 @@ export const createCrisis = async (req, res, next) => {
     next(err);
   }
 };
+
+//------------------ UPLOAD MEDICAL REPORT =================
+export const uploadMedicalReport = async (req, res, next) => {
+  try {
+    const file = req.file;
+    const user_id = req.user.id;
+
+    if (!file) {
+      return res.status(400).json({
+        message: "No file uploaded",
+      });
+    }
+
+    const fileName = `${user_id}-${Date.now()}-${file.originalname}`;
+
+    const { data, error } = await supabase.storage
+      .from("medical-reports")
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+      });
+
+    if (error) throw error;
+
+    const { data: publicUrl } = supabase.storage
+      .from("medical-reports")
+      .getPublicUrl(fileName);
+
+    res.json({
+      message: "Medical report uploaded successfully",
+      url: publicUrl.publicUrl,
+    });
+
+  } catch (err) {
+    console.log("UPLOAD ERROR:", err.message);
+    next(err);
+  }
+};

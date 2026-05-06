@@ -1,4 +1,5 @@
 import express from 'express';
+
 import {
   createUser,
   getUsers,
@@ -10,11 +11,13 @@ import {
   getDiary,
   createCrisis,
   deleteDiary,
-  updateDiary
+  updateDiary,
+  uploadMedicalReport
 } from '../controllers/userController.js';
 
 import { verifyUser } from '../middleware/authMiddleware.js';
 import { strictLimiter } from "../middleware/rateLimiter.js";
+import { upload } from "../middleware/uploadMiddleware.js";
 
 const router = express.Router();
 
@@ -38,5 +41,13 @@ router.patch('/diary/:id', verifyUser, updateDiary);
 
 // ================= CRISIS =================
 router.post('/crisis', verifyUser, strictLimiter, createCrisis);
+
+// ================= MEDICAL REPORT =================
+router.post(
+  '/upload-report',
+  verifyUser,
+  upload.single('report'),
+  uploadMedicalReport
+);
 
 export default router;
