@@ -15,26 +15,28 @@ import {
 
 import { verifyUser } from '../middleware/authMiddleware.js';
 import { strictLimiter } from "../middleware/rateLimiter.js";
+
 const router = express.Router();
 
-// public
+// ================= USERS =================
 router.post('/users', verifyUser, createUser);
-router.get('/users',verifyUser, getUsers);
+router.get('/users', verifyUser, getUsers);
 
-// protected
+// ================= CHAT =================
 router.post('/message', verifyUser, saveMessage);
 router.get('/conversation', verifyUser, getConversation);
 
+// ================= MOOD =================
 router.post('/mood', verifyUser, addMood);
 router.get('/mood', verifyUser, getMood);
 
+// ================= DIARY =================
 router.post('/diary', verifyUser, addDiary);
 router.get('/diary', verifyUser, getDiary);
-
-router.post('/crisis', verifyUser, strictLimiter, createCrisis);
-
 router.delete('/diary/:id', verifyUser, deleteDiary);
-
 router.patch('/diary/:id', verifyUser, updateDiary);
+
+// ================= CRISIS =================
+router.post('/crisis', verifyUser, strictLimiter, createCrisis);
 
 export default router;

@@ -25,6 +25,14 @@ const getUserClient = (req) => {
   );
 };
 
+//  NEW: normalize mood (CRITICAL FIX)
+const normalizeMood = (mood) => {
+  if (!mood) return undefined;
+  const valid = ["happy", "sad", "angry", "anxious", "neutral"];
+  const m = mood.toLowerCase().trim();
+  return valid.includes(m) ? m : undefined;
+};
+
 
 
 // ================= CREATE USER =================
@@ -73,7 +81,7 @@ export const getUsers = async (req, res, next) => {
 
 
 
-// ================= SAVE MESSAGE (AI INTEGRATED) =================
+// ================= SAVE MESSAGE =================
 export const saveMessage = async (req, res, next) => {
   try {
     const { message } = messageSchema.parse(req.body);
@@ -81,19 +89,11 @@ export const saveMessage = async (req, res, next) => {
 
     const supabaseUser = getUserClient(req);
 
-    // ❌ REMOVED DB consent query (columns don't exist)
-
-    // ✅ Call AI directly
     const aiResponse = await axios.post(
       "http://107.21.23.105:8000/chat",
-      {
-        user_id,
-        message,
-      },
+      { user_id, message },
       { timeout: 10000 }
     );
-
-    console.log("AI RAW RESPONSE:", aiResponse.data);
 
     const reply =
       aiResponse.data?.reply ||
@@ -102,7 +102,6 @@ export const saveMessage = async (req, res, next) => {
       aiResponse.data?.text ||
       "I'm here with you 💜";
 
-    // ✅ Save both messages
     const { error: insertError } = await supabaseUser
       .from("conversations")
       .insert([
@@ -112,7 +111,6 @@ export const saveMessage = async (req, res, next) => {
 
     if (insertError) throw insertError;
 
-    // ✅ Return reply
     res.json({ reply });
 
   } catch (err) {
@@ -198,13 +196,11 @@ export const addDiary = async (req, res, next) => {
   try {
     const { title, content, mood } = diarySchema.parse(req.body);
 
-    // 🔴 ensure user exists
     if (!req.user || !req.user.id) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
     const user_id = req.user.id;
-
     const supabaseUser = getUserClient(req);
 
     const { data, error } = await supabaseUser
@@ -212,16 +208,12 @@ export const addDiary = async (req, res, next) => {
       .insert([
         {
           user_id,
-          title,     // ⚠️ remove this line if column doesn't exist
+          title,
           content,
-          mood,
+          mood: normalizeMood(mood), // FIX
         },
       ])
       .select();
-
-    // 🔥 LOGS (VERY IMPORTANT)
-    console.log("INSERT DATA:", data);
-    console.log("INSERT ERROR:", error);
 
     if (error) {
       return res.status(500).json({
@@ -302,7 +294,11 @@ export const updateDiary = async (req, res, next) => {
 
     const { data, error } = await supabaseUser
       .from('diary_entries')
-      .update({ title, content, mood })
+      .update({
+        title,
+        content,
+        mood: normalizeMood(mood), // FIX
+      })
       .eq('id', id)
       .eq('user_id', user_id)
       .select();
@@ -321,27 +317,48 @@ export const updateDiary = async (req, res, next) => {
 // ================= CRISIS ALERT =================
 export const createCrisis = async (req, res, next) => {
   try {
-    const { message_that_triggered, alert_sent_to } = crisisSchema.parse(req.body);
+    const { message_that_triggered, alert_sent_to } =
+      crisisSchema.parse(req.body);
+
     const user_id = req.user.id;
 
     const supabaseUser = getUserClient(req);
 
     const { data, error } = await supabaseUser
-      .from('crisis_alerts')
-      .insert([{ user_id, message_that_triggered, alert_sent_to }])
+      .from("crisis_alerts")
+      .insert([
+        {
+          user_id,
+          message_that_triggered,
+          alert_sent_to,
+        },
+      ])
       .select();
 
     if (error) throw error;
 
+    const { data: userData } = await supabaseUser
+      .from("users")
+      .select("name")
+      .eq("user_id", user_id)
+      .single();
+
     try {
-      await sendCrisisEmail(alert_sent_to, message_that_triggered);
+      await sendCrisisEmail(
+        "yoursecondemail@gmail.com",
+        userData?.name || "A user",
+        message_that_triggered
+      );
+
+      console.log("Crisis email sent successfully");
+
     } catch (emailErr) {
       console.log("Email failed:", emailErr.message);
     }
 
     res.json({
       message: "Crisis alert saved + email attempted",
-      data
+      data,
     });
 
   } catch (err) {
