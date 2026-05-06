@@ -30,8 +30,8 @@ router.post('/message', verifyUser, saveMessage);
 router.get('/conversation', verifyUser, getConversation);
 
 // ================= MOOD =================
-router.post('/mood', verifyUser, addMood);
-router.get('/mood', verifyUser, getMood);
+router.post('/mood', verifyUser, strictLimiter, addMood);
+router.get('/mood', verifyUser, strictLimiter, getMood);
 
 // ================= DIARY =================
 router.post('/diary', verifyUser, addDiary);
