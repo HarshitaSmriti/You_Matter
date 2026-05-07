@@ -39,18 +39,33 @@ const normalizeMood = (mood) => {
 export const createUser = async (req, res, next) => {
   try {
     const user_id = req.user.id;
-    const { name } = req.body;
+
+    const {
+      userName,
+      userEmail,
+      guardianEmail,
+    } = req.body;
 
     const supabaseUser = getUserClient(req);
 
     const { data, error } = await supabaseUser
-      .from('users')
-      .insert([{ user_id, name }])
+      .from("users")
+      .insert([
+        {
+          user_id,
+          name: userName,
+          email: userEmail,
+          guardian_contact: guardianEmail,
+        },
+      ])
       .select();
 
     if (error) throw error;
 
-    res.json({ message: "Profile created", data });
+    res.json({
+      message: "Profile created",
+      data,
+    });
 
   } catch (err) {
     next(err);
