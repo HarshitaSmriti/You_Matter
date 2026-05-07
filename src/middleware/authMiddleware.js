@@ -1,26 +1,54 @@
 import supabase from "../config/supabaseClient.js";
 
-export const verifyUser = async (req, res, next) => {
+export const verifyUser = async (
+  req,
+  res,
+  next
+) => {
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader =
+      req.headers.authorization;
+
+    console.log("AUTH HEADER:", authHeader);
 
     if (!authHeader) {
-      return res.status(401).json({ error: "No token" });
+      return res.status(401).json({
+        error: "No token",
+      });
     }
 
-    const token = authHeader.split(" ")[1];
+    const token =
+      authHeader.split(" ")[1];
 
-    const { data, error } = await supabase.auth.getUser(token);
+    console.log(
+      "TOKEN EXISTS:",
+      !!token
+    );
 
-    if (error) {
-      return res.status(401).json({ error: error.message });
+    const { data, error } =
+      await supabase.auth.getUser(token);
+
+    console.log("SUPABASE USER:", data);
+    console.log("SUPABASE ERROR:", error);
+
+    if (error || !data.user) {
+      return res.status(401).json({
+        error:
+          error?.message || "Unauthorized",
+      });
     }
 
-    req.user = data.user; //  THIS IS CRITICAL
+    req.user = data.user;
 
     next();
   } catch (err) {
-    console.log("AUTH ERROR:", err.message);
-    res.status(500).json({ error: err.message });
+    console.log(
+      "AUTH ERROR:",
+      err.message
+    );
+
+    res.status(500).json({
+      error: err.message,
+    });
   }
 };
