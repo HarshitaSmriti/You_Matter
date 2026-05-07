@@ -12,7 +12,8 @@ import {
   createCrisis,
   deleteDiary,
   updateDiary,
-  uploadMedicalReport
+  uploadMedicalReport,
+  forgotPassword
 } from '../controllers/userController.js';
 
 import { verifyUser } from '../middleware/authMiddleware.js';
@@ -24,6 +25,12 @@ const router = express.Router();
 // ================= USERS =================
 router.post('/users', verifyUser, createUser);
 router.get('/users', verifyUser, getUsers);
+
+// ================= FORGOT PASSWORD =================
+router.post(
+  '/forgot-password',
+  forgotPassword
+);
 
 // ================= CHAT =================
 router.post('/message', verifyUser, saveMessage);

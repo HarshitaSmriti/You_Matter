@@ -96,6 +96,7 @@ export const getUsers = async (req, res, next) => {
 
 
 
+
 // ================= SAVE MESSAGE =================
 export const saveMessage = async (req, res, next) => {
   try {
@@ -374,6 +375,36 @@ export const createCrisis = async (req, res, next) => {
     res.json({
       message: "Crisis alert saved + email attempted",
       data,
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+//------------------FORGET PASSWORD =================
+export const forgotPassword = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const { email } = req.body;
+
+    const { error } =
+      await supabase.auth.resetPasswordForEmail(
+        email,
+        {
+          redirectTo:
+            "http://localhost:5173/reset-password",
+        }
+      );
+
+    if (error) throw error;
+
+    res.json({
+      message:
+        "Password reset email sent successfully",
     });
 
   } catch (err) {
