@@ -113,16 +113,15 @@ const getAiReply = async (user_id, message, userData, authUser) => {
   try {
     const aiUrl = process.env.AI_CHAT_URL || "http://107.21.23.105:8000/chat";
     const userName = getDisplayName(userData, authUser);
-    const guardianEmail = demoGuardianEmails;
+    const primaryGuardianEmail = demoGuardianEmails[0];
     const aiPayload = {
       user_id,
       message,
       consent: {
         user_name: userName,
-        guardian_email: guardianEmail,
-        guardian_emails: Array.isArray(guardianEmail)
-          ? guardianEmail
-          : [guardianEmail],
+        guardian_name: userName,
+        guardian_email: primaryGuardianEmail,
+        guardian_emails: demoGuardianEmails,
       },
     };
 
@@ -137,11 +136,27 @@ const getAiReply = async (user_id, message, userData, authUser) => {
       },
     });
 
-    const aiResponse = await axios.post(
-      aiUrl,
-      aiPayload,
-      { timeout: 10000 }
-    );
+    let aiResponse;
+
+    try {
+      aiResponse = await axios.post(
+        aiUrl,
+        aiPayload,
+        { timeout: 15000 }
+      );
+    } catch (firstError) {
+      console.log("AI consent request failed:", {
+        message: firstError.message,
+        status: firstError.response?.status,
+        data: firstError.response?.data,
+      });
+
+      aiResponse = await axios.post(
+        aiUrl,
+        { user_id, message },
+        { timeout: 15000 }
+      );
+    }
 
     console.log("AI response:", {
       status: aiResponse.status,
