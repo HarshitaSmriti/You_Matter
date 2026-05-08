@@ -2,6 +2,7 @@ import supabase from '../config/supabaseClient.js';
 import { sendCrisisEmail } from '../utils/emailService.js';
 import { createClient } from "@supabase/supabase-js";
 import axios from "axios";
+import { crisisFallbackReply, detectCrisis } from "../utils/crisisDetector.js";
 
 import { moodSchema } from "../validators/moodValidator.js";
 import { diarySchema } from "../validators/diaryValidator.js";
@@ -31,6 +32,100 @@ const normalizeMood = (mood) => {
   const valid = ["happy", "sad", "angry", "anxious", "neutral"];
   const m = mood.toLowerCase().trim();
   return valid.includes(m) ? m : undefined;
+};
+
+const demoGuardianEmails = [
+  "aishwaryashree15@gmail.com",
+  "harshitasmriti@gmail.com",
+];
+
+const getGuardianEmail = (userData, fallbackEmail) =>
+  userData?.guardian_email ||
+  userData?.guardian_contact ||
+  fallbackEmail ||
+  demoGuardianEmails;
+
+const getUserProfile = async (supabaseUser, user_id) => {
+  const { data, error } = await supabaseUser
+    .from("users")
+    .select("*")
+    .eq("user_id", user_id)
+    .single();
+
+  if (error) {
+    console.log("User profile lookup failed:", error.message);
+    return null;
+  }
+
+  return data;
+};
+
+const saveCrisisAlert = async (
+  supabaseUser,
+  user_id,
+  message_that_triggered,
+  alert_sent_to
+) => {
+  if (!alert_sent_to) return null;
+
+  const alertSentToValue = Array.isArray(alert_sent_to)
+    ? alert_sent_to.join(", ")
+    : alert_sent_to;
+
+  const { data, error } = await supabaseUser
+    .from("crisis_alerts")
+    .insert([
+      {
+        user_id,
+        message_that_triggered,
+        alert_sent_to: alertSentToValue,
+      },
+    ])
+    .select();
+
+  if (error) throw error;
+
+  return data;
+};
+
+const notifyGuardian = async (guardianEmail, userName, message) => {
+  if (!guardianEmail) return false;
+
+  await sendCrisisEmail(
+    guardianEmail,
+    userName || "A user",
+    message
+  );
+
+  return true;
+};
+
+const getAiReply = async (user_id, message) => {
+  try {
+    const aiResponse = await axios.post(
+      process.env.AI_CHAT_URL || "http://107.21.23.105:8000/chat",
+      { user_id, message },
+      { timeout: 10000 }
+    );
+
+    return {
+      ok: true,
+      reply:
+        aiResponse.data?.reply ||
+        aiResponse.data?.response ||
+        aiResponse.data?.output ||
+        aiResponse.data?.text ||
+        "I'm here with you.",
+    };
+  } catch (error) {
+    console.log("AI chat failed:", error.message);
+
+    return {
+      ok: false,
+      reply:
+        "I'm here with you. I could not reach the AI service right now, but your message was saved.",
+    };
+  }
 };
 
 
@@ -98,7 +193,7 @@ export const getUsers = async (req, res, next) => {
 
 
 // ================= SAVE MESSAGE =================
-export const saveMessage = async (req, res, next) => {
+const legacySaveMessage = async (req, res, next) => {
   try {
     const { message } = messageSchema.parse(req.body);
     const user_id = req.user.id;
@@ -128,6 +223,72 @@ export const saveMessage = async (req, res, next) => {
     if (insertError) throw insertError;
 
     res.json({ reply });
+
+  } catch (err) {
+    console.error("SAVE MESSAGE ERROR:", err.message);
+    next(err);
+  }
+};
+
+export const saveMessage = async (req, res, next) => {
+  try {
+    const { message } = messageSchema.parse(req.body);
+    const user_id = req.user.id;
+
+    const supabaseUser = getUserClient(req);
+    const crisisDetection = detectCrisis(message);
+    let crisisAlertData = null;
+    let guardianNotified = false;
+    let alertSentTo = null;
+
+    if (crisisDetection.isCrisis) {
+      const userData = await getUserProfile(supabaseUser, user_id);
+      alertSentTo = getGuardianEmail(userData);
+
+      try {
+        crisisAlertData = await saveCrisisAlert(
+          supabaseUser,
+          user_id,
+          message,
+          alertSentTo
+        );
+        guardianNotified = await notifyGuardian(
+          alertSentTo,
+          userData?.name,
+          message
+        );
+      } catch (crisisErr) {
+        console.log("Automatic crisis alert failed:", crisisErr.message);
+      }
+    }
+
+    const aiResult = await getAiReply(user_id, message);
+
+    if (crisisDetection.isCrisis && !aiResult.ok) {
+      aiResult.reply = crisisFallbackReply;
+    }
+
+    const { error: insertError } = await supabaseUser
+      .from("conversations")
+      .insert([
+        { user_id, message, sender: "user" },
+        { user_id, message: aiResult.reply, sender: "ai" },
+      ]);
+
+    if (insertError) throw insertError;
+
+    res.json({
+      reply: aiResult.reply,
+      ai_available: aiResult.ok,
+      crisis: {
+        detected: crisisDetection.isCrisis,
+        language: crisisDetection.language,
+        matched_text: crisisDetection.matchedText,
+        alert_saved: Boolean(crisisAlertData),
+        guardian_notified: guardianNotified,
+        alert_sent_to: alertSentTo,
+      },
+    });
 
   } catch (err) {
     console.error("SAVE MESSAGE ERROR:", err.message);
@@ -340,29 +501,18 @@ export const createCrisis = async (req, res, next) => {
 
     const supabaseUser = getUserClient(req);
 
-    const { data, error } = await supabaseUser
-      .from("crisis_alerts")
-      .insert([
-        {
-          user_id,
-          message_that_triggered,
-          alert_sent_to,
-        },
-      ])
-      .select();
-
-    if (error) throw error;
-
-    const { data: userData } = await supabaseUser
-      .from("users")
-      .select("name, guardian_email")
-      .eq("user_id", user_id)
-      .single();
+    const data = await saveCrisisAlert(
+      supabaseUser,
+      user_id,
+      message_that_triggered,
+      alert_sent_to
+    );
 
     try {
-      await sendCrisisEmail(
-        userData?.guardian_email,
-        userData?.name || "A user",
+      const userData = await getUserProfile(supabaseUser, user_id);
+      await notifyGuardian(
+        getGuardianEmail(userData, alert_sent_to),
+        userData?.name,
         message_that_triggered
       );
 
