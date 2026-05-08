@@ -40,6 +40,7 @@ const demoGuardianEmails = [
 ];
 
 const crisisEmailEnabled = process.env.ENABLE_CRISIS_EMAIL === "true";
+const aiTimeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
 
 const getGuardianEmail = (userData, fallbackEmail) =>
   userData?.guardian_email ||
@@ -142,7 +143,7 @@ const getAiReply = async (user_id, message, userData, authUser) => {
       aiResponse = await axios.post(
         aiUrl,
         aiPayload,
-        { timeout: 15000 }
+        { timeout: aiTimeoutMs }
       );
     } catch (firstError) {
       console.log("AI consent request failed:", {
@@ -151,10 +152,14 @@ const getAiReply = async (user_id, message, userData, authUser) => {
         data: firstError.response?.data,
       });
 
+      if (detectCrisis(message).isCrisis) {
+        throw firstError;
+      }
+
       aiResponse = await axios.post(
         aiUrl,
         { user_id, message },
-        { timeout: 15000 }
+        { timeout: aiTimeoutMs }
       );
     }
 
