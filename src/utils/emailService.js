@@ -1,24 +1,27 @@
 import nodemailer from "nodemailer";
+import { resolve4 } from "dns/promises";
 
-const createGmailTransporter = ({ port, secure }) =>
+const createGmailTransporter = ({ host, port, secure }) =>
   nodemailer.createTransport({
-    host: "smtp.gmail.com",
+    host,
     port,
     secure,
-    family: 4,
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 20000,
+    tls: {
+      servername: "smtp.gmail.com",
+    },
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
   });
 
-const gmailTransporters = [
-  createGmailTransporter({ port: 465, secure: true }),
-  createGmailTransporter({ port: 587, secure: false }),
-];
+const getGmailIpv4Host = async () => {
+  const addresses = await resolve4("smtp.gmail.com");
+  return addresses[0];
+};
 
 const escapeHtml = (value = "") =>
   value
@@ -56,6 +59,14 @@ export const sendCrisisEmail = async (
   };
 
   let lastError;
+
+  const gmailHost = await getGmailIpv4Host();
+  const gmailTransporters = [
+    createGmailTransporter({ host: gmailHost, port: 465, secure: true }),
+    createGmailTransporter({ host: gmailHost, port: 587, secure: false }),
+  ];
+
+  console.log("Using Gmail SMTP IPv4 host:", gmailHost);
 
   for (const transporter of gmailTransporters) {
     try {
