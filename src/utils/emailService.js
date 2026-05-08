@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { resolve4 } from "dns/promises";
+import axios from "axios";
 
 const createGmailTransporter = ({ host, port, secure }) =>
   nodemailer.createTransport({
@@ -39,6 +40,22 @@ export const sendCrisisEmail = async (
 ) => {
   if (!guardianEmail) {
     throw new Error("Guardian email is missing");
+  }
+
+  if (process.env.CRISIS_EMAIL_WEBHOOK_URL) {
+    const response = await axios.post(
+      process.env.CRISIS_EMAIL_WEBHOOK_URL,
+      {
+        to: guardianEmail,
+        userName,
+        message,
+        subject: "Urgent Mental Health Alert",
+      },
+      { timeout: 15000 }
+    );
+
+    console.log("Crisis email webhook sent:", response.status);
+    return response.data;
   }
 
   const mailOptions = {
