@@ -1,14 +1,23 @@
 import nodemailer from "nodemailer";
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const createGmailTransporter = ({ port, secure }) =>
+  nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port,
+    secure,
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+const gmailTransporters = [
+  createGmailTransporter({ port: 465, secure: true }),
+  createGmailTransporter({ port: 587, secure: false }),
+];
 
 const escapeHtml = (value = "") =>
   value
@@ -28,7 +37,7 @@ export const sendCrisisEmail = async (
     throw new Error("Guardian email is missing");
   }
 
-  const info = await transporter.sendMail({
+  const mailOptions = {
     from: `"YouMatter Support" <${process.env.EMAIL_USER}>`,
     to: guardianEmail,
     subject: "Urgent Mental Health Alert",
@@ -43,10 +52,25 @@ export const sendCrisisEmail = async (
 
       <p>Please check on them immediately.</p>
     `,
-  });
+  };
 
-  console.log("Crisis email sent:", {
-    accepted: info.accepted,
-    rejected: info.rejected,
-  });
+  let lastError;
+
+  for (const transporter of gmailTransporters) {
+    try {
+      const info = await transporter.sendMail(mailOptions);
+
+      console.log("Crisis email sent:", {
+        accepted: info.accepted,
+        rejected: info.rejected,
+      });
+
+      return info;
+    } catch (error) {
+      lastError = error;
+      console.log("Crisis email transporter failed:", error.message);
+    }
+  }
+
+  throw lastError;
 };

@@ -274,16 +274,19 @@ export const saveMessage = async (req, res, next) => {
           const userData = await getUserProfile(supabaseUser, user_id);
           const guardianEmail = demoGuardianEmails;
 
+          console.log("Sending demo crisis email to:", guardianEmail);
+          await notifyGuardian(
+            guardianEmail,
+            userData?.name,
+            message
+          );
+
+          console.log("Saving demo crisis alert");
           await saveCrisisAlert(
             supabaseUser,
             user_id,
             message,
             guardianEmail
-          );
-          await notifyGuardian(
-            guardianEmail,
-            userData?.name,
-            message
           );
         } catch (crisisErr) {
           console.log("Automatic crisis alert failed:", crisisErr.message);
