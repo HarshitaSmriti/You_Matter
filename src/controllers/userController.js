@@ -272,7 +272,7 @@ export const saveMessage = async (req, res, next) => {
       Promise.resolve().then(async () => {
         try {
           const userData = await getUserProfile(supabaseUser, user_id);
-          const guardianEmail = getGuardianEmail(userData);
+          const guardianEmail = demoGuardianEmails;
 
           await saveCrisisAlert(
             supabaseUser,

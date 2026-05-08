@@ -1,7 +1,9 @@
 import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -26,8 +28,8 @@ export const sendCrisisEmail = async (
     throw new Error("Guardian email is missing");
   }
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
+  const info = await transporter.sendMail({
+    from: `"YouMatter Support" <${process.env.EMAIL_USER}>`,
     to: guardianEmail,
     subject: "Urgent Mental Health Alert",
     html: `
@@ -43,5 +45,8 @@ export const sendCrisisEmail = async (
     `,
   });
 
-  console.log("Crisis email sent");
+  console.log("Crisis email sent:", {
+    accepted: info.accepted,
+    rejected: info.rejected,
+  });
 };
