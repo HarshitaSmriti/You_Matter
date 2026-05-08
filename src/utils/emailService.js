@@ -5,6 +5,7 @@ const createGmailTransporter = ({ port, secure }) =>
     host: "smtp.gmail.com",
     port,
     secure,
+    family: 4,
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 20000,
