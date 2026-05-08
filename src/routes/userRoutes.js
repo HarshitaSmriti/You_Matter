@@ -16,7 +16,7 @@ import {
   forgotPassword
 } from '../controllers/userController.js';
 
-import { verifyUser } from '../middleware/authMiddleware.js';
+import { optionalVerifyUser, verifyUser } from '../middleware/authMiddleware.js';
 import { strictLimiter } from "../middleware/rateLimiter.js";
 import { upload } from "../middleware/uploadMiddleware.js";
 
@@ -33,7 +33,7 @@ router.post(
 );
 
 // ================= CHAT =================
-router.post('/message', verifyUser, saveMessage);
+router.post('/message', optionalVerifyUser, saveMessage);
 router.get('/conversation', verifyUser, getConversation);
 
 // ================= MOOD =================

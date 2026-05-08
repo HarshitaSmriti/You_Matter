@@ -52,3 +52,53 @@ export const verifyUser = async (
     });
   }
 };
+
+export const optionalVerifyUser = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const authHeader =
+      req.headers.authorization;
+
+    if (!authHeader) {
+      req.isDemoUser = true;
+      req.user = {
+        id: "demo-user",
+        email: null,
+        user_metadata: {},
+      };
+      return next();
+    }
+
+    const token =
+      authHeader.split(" ")[1];
+
+    const { data, error } =
+      await supabase.auth.getUser(token);
+
+    if (error || !data.user) {
+      req.isDemoUser = true;
+      req.user = {
+        id: "demo-user",
+        email: null,
+        user_metadata: {},
+      };
+      return next();
+    }
+
+    req.user = data.user;
+    req.isDemoUser = false;
+
+    next();
+  } catch (err) {
+    req.isDemoUser = true;
+    req.user = {
+      id: "demo-user",
+      email: null,
+      user_metadata: {},
+    };
+    next();
+  }
+};

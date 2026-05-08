@@ -113,13 +113,12 @@ const getAiReply = async (user_id, message, userData, authUser) => {
   try {
     const aiUrl = process.env.AI_CHAT_URL || "http://107.21.23.105:8000/chat";
     const userName = getDisplayName(userData, authUser);
-    const guardianEmail = getGuardianEmail(userData);
+    const guardianEmail = demoGuardianEmails;
     const aiPayload = {
       user_id,
       message,
       consent: {
         user_name: userName,
-        guardian_name: userName,
         guardian_email: guardianEmail,
         guardian_emails: Array.isArray(guardianEmail)
           ? guardianEmail
@@ -281,7 +280,9 @@ export const saveMessage = async (req, res, next) => {
     const alertSentTo = crisisDetection.isCrisis && crisisEmailEnabled
       ? demoGuardianEmails
       : null;
-    const userData = await getUserProfile(supabaseUser, user_id);
+    const userData = req.isDemoUser
+      ? null
+      : await getUserProfile(supabaseUser, user_id);
 
     const aiResult = await getAiReply(user_id, message, userData, req.user);
 
@@ -289,14 +290,16 @@ export const saveMessage = async (req, res, next) => {
       aiResult.reply = crisisFallbackReply;
     }
 
-    const { error: insertError } = await supabaseUser
-      .from("conversations")
-      .insert([
-        { user_id, message, sender: "user" },
-        { user_id, message: aiResult.reply, sender: "ai" },
-      ]);
+    if (!req.isDemoUser) {
+      const { error: insertError } = await supabaseUser
+        .from("conversations")
+        .insert([
+          { user_id, message, sender: "user" },
+          { user_id, message: aiResult.reply, sender: "ai" },
+        ]);
 
-    if (insertError) throw insertError;
+      if (insertError) throw insertError;
+    }
 
     res.json({
       reply: aiResult.reply,
