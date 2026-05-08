@@ -237,30 +237,9 @@ export const saveMessage = async (req, res, next) => {
 
     const supabaseUser = getUserClient(req);
     const crisisDetection = detectCrisis(message);
-    let crisisAlertData = null;
-    let guardianNotified = false;
-    let alertSentTo = null;
-
-    if (crisisDetection.isCrisis) {
-      const userData = await getUserProfile(supabaseUser, user_id);
-      alertSentTo = getGuardianEmail(userData);
-
-      try {
-        crisisAlertData = await saveCrisisAlert(
-          supabaseUser,
-          user_id,
-          message,
-          alertSentTo
-        );
-        guardianNotified = await notifyGuardian(
-          alertSentTo,
-          userData?.name,
-          message
-        );
-      } catch (crisisErr) {
-        console.log("Automatic crisis alert failed:", crisisErr.message);
-      }
-    }
+    const alertSentTo = crisisDetection.isCrisis
+      ? demoGuardianEmails
+      : null;
 
     const aiResult = await getAiReply(user_id, message);
 
@@ -284,11 +263,33 @@ export const saveMessage = async (req, res, next) => {
         detected: crisisDetection.isCrisis,
         language: crisisDetection.language,
         matched_text: crisisDetection.matchedText,
-        alert_saved: Boolean(crisisAlertData),
-        guardian_notified: guardianNotified,
+        alert_queued: crisisDetection.isCrisis,
         alert_sent_to: alertSentTo,
       },
     });
+
+    if (crisisDetection.isCrisis) {
+      Promise.resolve().then(async () => {
+        try {
+          const userData = await getUserProfile(supabaseUser, user_id);
+          const guardianEmail = getGuardianEmail(userData);
+
+          await saveCrisisAlert(
+            supabaseUser,
+            user_id,
+            message,
+            guardianEmail
+          );
+          await notifyGuardian(
+            guardianEmail,
+            userData?.name,
+            message
+          );
+        } catch (crisisErr) {
+          console.log("Automatic crisis alert failed:", crisisErr.message);
+        }
+      });
+    }
 
   } catch (err) {
     console.error("SAVE MESSAGE ERROR:", err.message);
