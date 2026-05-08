@@ -102,13 +102,52 @@ const notifyGuardian = async (guardianEmail, userName, message) => {
   return true;
 };
 
-const getAiReply = async (user_id, message) => {
+const getDisplayName = (userData, authUser) =>
+  userData?.name ||
+  authUser?.user_metadata?.full_name ||
+  authUser?.user_metadata?.name ||
+  authUser?.email ||
+  "User";
+
+const getAiReply = async (user_id, message, userData, authUser) => {
   try {
+    const aiUrl = process.env.AI_CHAT_URL || "http://107.21.23.105:8000/chat";
+    const userName = getDisplayName(userData, authUser);
+    const guardianEmail = getGuardianEmail(userData);
+    const aiPayload = {
+      user_id,
+      message,
+      consent: {
+        user_name: userName,
+        guardian_name: userName,
+        guardian_email: guardianEmail,
+        guardian_emails: Array.isArray(guardianEmail)
+          ? guardianEmail
+          : [guardianEmail],
+      },
+    };
+
+    console.log("AI request:", {
+      url: aiUrl,
+      payload: {
+        ...aiPayload,
+        consent: {
+          ...aiPayload.consent,
+          guardian_email: aiPayload.consent.guardian_email,
+        },
+      },
+    });
+
     const aiResponse = await axios.post(
-      process.env.AI_CHAT_URL || "http://107.21.23.105:8000/chat",
-      { user_id, message },
+      aiUrl,
+      aiPayload,
       { timeout: 10000 }
     );
+
+    console.log("AI response:", {
+      status: aiResponse.status,
+      keys: Object.keys(aiResponse.data || {}),
+    });
 
     return {
       ok: true,
@@ -242,8 +281,9 @@ export const saveMessage = async (req, res, next) => {
     const alertSentTo = crisisDetection.isCrisis && crisisEmailEnabled
       ? demoGuardianEmails
       : null;
+    const userData = await getUserProfile(supabaseUser, user_id);
 
-    const aiResult = await getAiReply(user_id, message);
+    const aiResult = await getAiReply(user_id, message, userData, req.user);
 
     if (crisisDetection.isCrisis && !aiResult.ok) {
       aiResult.reply = crisisFallbackReply;
@@ -273,7 +313,6 @@ export const saveMessage = async (req, res, next) => {
     if (crisisDetection.isCrisis && crisisEmailEnabled) {
       Promise.resolve().then(async () => {
         try {
-          const userData = await getUserProfile(supabaseUser, user_id);
           const guardianEmail = demoGuardianEmails;
 
           console.log("Sending demo crisis email to:", guardianEmail);
