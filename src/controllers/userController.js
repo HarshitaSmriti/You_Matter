@@ -270,7 +270,7 @@ const legacySaveMessage = async (req, res, next) => {
     const aiResponse = await axios.post(
       "http://107.21.23.105:8000/chat",
       { user_id, message },
-      { timeout: 10000 }
+      { timeout: 12000 }
     );
 
     const reply =
