@@ -40,7 +40,7 @@ const demoGuardianEmails = [
 ];
 
 const crisisEmailEnabled = process.env.ENABLE_CRISIS_EMAIL === "true";
-const aiTimeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
+const aiTimeoutMs = Number(process.env.AI_TIMEOUT_MS || 120000);
 
 const getGuardianEmail = (userData, fallbackEmail) =>
   userData?.guardian_email ||
