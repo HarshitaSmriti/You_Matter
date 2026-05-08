@@ -39,6 +39,8 @@ const demoGuardianEmails = [
   "harshitasmriti@gmail.com",
 ];
 
+const crisisEmailEnabled = process.env.ENABLE_CRISIS_EMAIL === "true";
+
 const getGuardianEmail = (userData, fallbackEmail) =>
   userData?.guardian_email ||
   userData?.guardian_contact ||
@@ -237,7 +239,7 @@ export const saveMessage = async (req, res, next) => {
 
     const supabaseUser = getUserClient(req);
     const crisisDetection = detectCrisis(message);
-    const alertSentTo = crisisDetection.isCrisis
+    const alertSentTo = crisisDetection.isCrisis && crisisEmailEnabled
       ? demoGuardianEmails
       : null;
 
@@ -263,12 +265,12 @@ export const saveMessage = async (req, res, next) => {
         detected: crisisDetection.isCrisis,
         language: crisisDetection.language,
         matched_text: crisisDetection.matchedText,
-        alert_queued: crisisDetection.isCrisis,
+        alert_queued: crisisDetection.isCrisis && crisisEmailEnabled,
         alert_sent_to: alertSentTo,
       },
     });
 
-    if (crisisDetection.isCrisis) {
+    if (crisisDetection.isCrisis && crisisEmailEnabled) {
       Promise.resolve().then(async () => {
         try {
           const userData = await getUserProfile(supabaseUser, user_id);
