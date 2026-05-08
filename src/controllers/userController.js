@@ -173,10 +173,17 @@ const getAiReply = async (user_id, message, userData, authUser) => {
         "I'm here with you.",
     };
   } catch (error) {
-    console.log("AI chat failed:", error.message);
+    const aiError = {
+      message: error.message,
+      status: error.response?.status || null,
+      data: error.response?.data || null,
+    };
+
+    console.log("AI chat failed:", aiError);
 
     return {
       ok: false,
+      error: aiError,
       reply:
         "I'm here with you. I could not reach the AI service right now, but your message was saved.",
     };
@@ -319,6 +326,7 @@ export const saveMessage = async (req, res, next) => {
     res.json({
       reply: aiResult.reply,
       ai_available: aiResult.ok,
+      ai_error: aiResult.error || null,
       crisis: {
         detected: crisisDetection.isCrisis,
         language: crisisDetection.language,
